@@ -312,7 +312,7 @@ function main_menu() {
         echo "9. Change Game Difficulty"
         echo "10. Change Map"
         echo "q. Quit"
-        read -p "Please enter your choice(1-9,q): " choice
+        read -p "Please enter your choice(1-10,q): " choice
 
         case $choice in
             1) activate_control_panel ;;
