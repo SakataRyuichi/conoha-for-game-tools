@@ -82,7 +82,9 @@ function update_server_config_param() {
             }
         }
     "
-    awk "$awk_script" "$SERVER_CONFIG_FILE" > "$SERVER_CONFIG_FILE.temp" && mv "$SERVER_CONFIG_FILE.temp" "$SERVER_CONFIG_FILE"
+
+    local temp_file=$SERVER_CONFIG_FILE.temp
+    cp -fp "$SERVER_CONFIG_FILE" "$temp_file" && awk "$awk_script" "$SERVER_CONFIG_FILE" > "$temp_file" && mv "$temp_file" "$SERVER_CONFIG_FILE"
 
     config_updated=true
 }
