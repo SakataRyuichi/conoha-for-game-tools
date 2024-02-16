@@ -6,6 +6,7 @@ ConoHa for GAME の ARK: Survival Evolved サーバーの設定変更を補助�
 以下の項目を設定できます。
 
 - サーバー名
+- マップ
 - 参加パスワード
 - 管理パスワード
 - RCON有効／無効

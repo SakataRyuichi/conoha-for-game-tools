@@ -9,6 +9,9 @@ declare -r SYSTEMD_OVERRIDE_CONFIG_FILE="$SYSTEMD_OVERRIDE_CONFIG_DIR/override.c
 declare -r SERVER_DIR="/opt/ark"
 declare -r SERVER_CONFIG_FILE="$SERVER_DIR/ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini"
 
+declare -r -a MAPS=("TheIsland" "TheCenter" "Ragnarok" "Valguero" "CrystalIsles" "LostIsland" "Fjordur")
+
+
 config_updated=false
 
 function die() {
@@ -23,20 +26,71 @@ function check_conoha_for_game() {
     fi
 }
 
+function create_systemd_override_config() {
+    mkdir -p "$SYSTEMD_OVERRIDE_CONFIG_DIR"
+
+    if [ ! -f "$SYSTEMD_OVERRIDE_CONFIG_FILE" ]; then
+        echo "[Service]" > $SYSTEMD_OVERRIDE_CONFIG_FILE
+        echo "ExecStart=" >> $SYSTEMD_OVERRIDE_CONFIG_FILE
+        grep -E "^ExecStart=" "$SYSTEMD_DEFAULT_CONFIG_FILE" >> "$SYSTEMD_OVERRIDE_CONFIG_FILE"
+    fi
+}
+
+function print_current_systemd_map_name() {
+    default_config=$(grep -E "^ExecStart=" $SYSTEMD_DEFAULT_CONFIG_FILE)
+    override_config=""
+    if [ -f "$SYSTEMD_OVERRIDE_CONFIG_FILE" ]; then
+        override_config=$(grep -E "^ExecStart=" $SYSTEMD_OVERRIDE_CONFIG_FILE)
+    fi
+
+    line=$(echo -e -n "$default_config\n$override_config" | grep -E "^ExecStart=" | tail -1)
+    value=$(echo "$line" | sed -E "s/^[^ ]+ ([^ ?]+)\?.+$/\\1/")
+
+    echo -n $value
+}
+
+function print_current_systemd_config_param() {
+    param="$1"
+
+    default_config=$(grep -E "^ExecStart=" $SYSTEMD_DEFAULT_CONFIG_FILE)
+    override_config=""
+    if [ -f "$SYSTEMD_OVERRIDE_CONFIG_FILE" ]; then
+        override_config=$(grep -E "^ExecStart=" $SYSTEMD_OVERRIDE_CONFIG_FILE)
+    fi
+
+    line=$(echo -e -n "$default_config\n$override_config" | grep -E "^ExecStart=" | tail -1)
+    value=$(echo "$line" | sed -E "s/^ExecStart=[^ ]+ .*\?$param=(\"([^\"]*)\"|([^ \"\?]*)).*$/\\2\\3/")
+
+    echo -n $value
+}
+
+function update_systemd_map_name() {
+    value="$1"
+
+    create_systemd_override_config
+
+    sed -i -E "s/^(ExecStart=[^ ]+ )[^ ?]+(\?.+)$/\\1$value\\2/" "$SYSTEMD_OVERRIDE_CONFIG_FILE"
+
+    config_updated=true
+
+    systemctl daemon-reload
+}
+
 function update_systemd_config_param() {
     param="$1"
     value="$2"
-    valuetype="$3"
 
     value="${value//\//\\/}"
     if [[ "$value" == *" "* ]]; then
         value="\"$value\""
     fi
 
-    if grep -q -E "^ExecStart=\/.+ .+\?$param=" "$SYSTEMD_DEFAULT_CONFIG_FILE"; then
-        sed -i -E "s/^(ExecStart=\/.+ .+\?$param=)(\"[^\"]*\"|[^ \"\?]*)/\\1$value/" "$SYSTEMD_DEFAULT_CONFIG_FILE"
+    create_systemd_override_config
+
+    if grep -q -E "^ExecStart=\/.+ .+\?$param=" "$SYSTEMD_OVERRIDE_CONFIG_FILE"; then
+        sed -i -E "s/^(ExecStart=\/.+ .+\?$param=)(\"[^\"]*\"|[^ \"\?]*)/\\1$value/" "$SYSTEMD_OVERRIDE_CONFIG_FILE"
     else
-        sed -i -E "s/^(ExecStart=\/.+ .+(\?.+=(\"[^\"]*\"|[^ \"\?]*))*)/\\1\?$param=$value/" "$SYSTEMD_DEFAULT_CONFIG_FILE"
+        sed -i -E "s/^(ExecStart=\/.+ .+(\?.+=(\"[^\"]*\"|[^ \"\?]*))*)/\\1\?$param=$value/" "$SYSTEMD_OVERRIDE_CONFIG_FILE"
     fi
 
     config_updated=true
@@ -44,13 +98,23 @@ function update_systemd_config_param() {
     systemctl daemon-reload
 }
 
-function print_current_systemd_config_param() {
-    param="$1"
 
-    line=$(grep -E "^ExecStart=" $SYSTEMD_DEFAULT_CONFIG_FILE | tail -1)
-    value=$(echo "$line" | sed -E "s/^.+ .*\?$param=(\"([^\"]*)\"|([^ \"\?]*)).*$/\\2\\3/")
+function print_current_server_config_param() {
+    local section="$1"
+    local option="$2"
 
-    echo -n $value
+    local awk_script="
+        BEGIN {section_found=0; option_found=0}
+        /^\[$section\]\$/ {section_found=1; next}
+        section_found == 1 && /^\[.*\]\$/ {exit}
+        section_found == 1 && /^$option=/ {
+            print \$0; 
+            option_found=1; 
+            exit
+        }
+    "
+
+    awk -F '=' "$awk_script" "$SERVER_CONFIG_FILE" | sed -n "s/^$option=//p"
 }
 
 function update_server_config_param() {
@@ -89,24 +153,7 @@ function update_server_config_param() {
     config_updated=true
 }
 
-function print_current_server_config_param() {
-    local section="$1"
-    local option="$2"
 
-    local awk_script="
-        BEGIN {section_found=0; option_found=0}
-        /^\[$section\]\$/ {section_found=1; next}
-        section_found == 1 && /^\[.*\]\$/ {exit}
-        section_found == 1 && /^$option=/ {
-            print \$0; 
-            option_found=1; 
-            exit
-        }
-    "
-
-    # Extract and print the current value of the specified option
-    awk -F '=' "$awk_script" "$SERVER_CONFIG_FILE" | sed -n "s/^$option=//p"
-}
 
 function change_hostname() {
     echo
@@ -122,6 +169,28 @@ function change_hostname() {
             break
         fi
     done
+}
+
+function change_map() {
+    echo
+    current_val=$(print_current_systemd_map_name)
+    echo "Current Map: $current_val"
+
+    while true; do
+        for i in "${!MAPS[@]}"; do 
+            echo "$((i+1)): ${MAPS[i]}"
+        done
+        read -p "Select Map(1-${#MAPS[@]}): " map_number
+        if [ -z "$map_number" ]; then
+            break
+        elif [[ $map_number =~ ^[0-9]+$ ]] && [ $map_number -ge 1 ] && [ $map_number -le ${#MAPS[@]} ]; then
+            map="${MAPS[$((map_number-1))]}"
+            update_systemd_map_name "$map"
+            break
+        fi
+        echo "Invalid choice."
+    done
+
 }
 
 function change_join_password() {
@@ -208,17 +277,19 @@ function main_menu() {
     while true; do
         echo
         echo "1. Change Server Hostname"
-        echo "2. Change Join Password"
-        echo "3. Change Admin Password"
-        echo "4. Enable/Disable RCON"
+        echo "2. Change Map"
+        echo "3. Change Join Password"
+        echo "4. Change Admin Password"
+        echo "5. Enable/Disable RCON"
         echo "q. Quit"
-        read -p "Please enter your choice(1-4,q): " choice
+        read -p "Please enter your choice(1-5,q): " choice
 
         case $choice in
             1) change_hostname ;;
-            2) change_join_password ;;
-            3) change_admin_password ;;
-            4) toggle_rcon ;;
+            2) change_map ;;
+            3) change_join_password ;;
+            4) change_admin_password ;;
+            5) toggle_rcon ;;
             q) quit ;;
             *) echo "Invalid choice. Please try again." ;;
         esac
