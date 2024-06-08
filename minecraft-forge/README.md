@@ -3,10 +3,12 @@
 ConoHa for GAME で Minecraft Forge サーバーのバージョン変更（ダウングレード・アップデート）が行えるスクリプトです。
 
 ## 事前準備
+
 - ConoHa for GAME で Minecraft Forge テンプレートでサーバーを作成する
 - Minecraft manager を開き、バックアップを作成する
 
 ## セットアップ手順
+
 - サーバー詳細画面で、[コンソール]ボタンをクリックします。
 - butterfly の画面が表示されるので、[Enter]キーを押します。
 - ログインIDは root、パスワードはサーバー作成時に指定したrootパスワードを指定して[Enter]キーを押します。
@@ -17,7 +19,17 @@ curl -s https://raw.githubusercontent.com/shinya-blogger/conoha-for-game-tools/m
 以下が実行例です。
 ```
 curl -s https://raw.githubusercontent.com/shinya-blogger/conoha-for-game-tools/main/minecraft-forge/install.sh | bash -s 1.19.2
+curl -s https://raw.githubusercontent.com/shinya-blogger/conoha-for-game-tools/main/minecraft-forge/install.sh | bash -s 1.12
 ```
+
 ## 注意事項
+
 - 当スクリプトでバージョン変更を行った後は、Minecraft manager でのバージョンアップはできません。
 - Minecraft manager が対応しているバージョンは 1.19系、1.16系、1.12系 です。これ以外のバージョンに変更すると、Minecraft manager が正しく動作しません。
+- 指定した Minecraft バージョンの Minecraft Forge 最新版をインストールします。
+
+## 解説記事
+
+以下の記事で詳しい使い方を解説しています。
+
+[https://kozenist.com/conoha-for-game-minecraft-forge-version/](https://kozenist.com/conoha-for-game-minecraft-forge-version/)

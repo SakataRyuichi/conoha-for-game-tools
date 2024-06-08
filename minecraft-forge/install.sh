@@ -33,7 +33,7 @@ function stopServer() {
 function detectUrl() {
 	local version=$1
 
-	url=$(curl -so- https://files.minecraftforge.net/net/minecraftforge/forge/index_${version}.html | xmllint --xpath '//table[@class="download-list"]/tbody/tr/td/ul/li/a[contains(@href,"-installer.jar")][not(contains(@href,"&"))]/@href' --html - 2> /dev/null | grep 'href=' | grep '\.0-installer' | head -1 | sed 's/[^"]*"\([^"]*\)"[^"]*/\1/g')
+	url=$(curl -so- https://files.minecraftforge.net/net/minecraftforge/forge/index_${version}.html | xmllint --xpath '//table[@class="download-list"]/tbody/tr/td/ul/li/a[contains(@href,"-installer.jar")][not(contains(@href,"&"))]/@href' --html - 2> /dev/null | grep 'href=' | grep '\-installer' | head -1 | sed 's/[^"]*"\([^"]*\)"[^"]*/\1/g')
 	if [ "$url" == "" ]; then
 		echo "ERROR: Installer was not found for the version: ${version}"
 		exit 1
